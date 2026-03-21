@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>SHADOW STRIKER X</title>
+<link rel='stylesheet' href='styles.css'>
+
+</head>
+<body>
+<canvas id="bgcanvas"></canvas>
+<div id="flash"></div><div id="cpop"></div><div id="ann"></div>
+<div id="lvlann"><span class="lat1" id="lat1"></span><span class="lat2" id="lat2"></span></div>
+<div id="taunt-b"><span class="tnm" id="tnm"></span><span id="ttxt"></span></div>
+
+<!-- SPLASH -->
+<div class="pg" id="pg-splash" style="background:transparent;">
+  <div class="logo" style="cursor:pointer;" onclick="goTo('pg-instr')">SHADOW<br>STRIKER X</div>
+  <span class="logo-tag">◆ ULTIMATE FIGHTING GAUNTLET ◆</span>
+  <div class="splash-sub">100 LEVELS · REALISTIC FIGHTERS · AI ENEMIES</div>
+  <div class="press-start" onclick="goTo('pg-instr')">▶ PRESS ANYWHERE TO START</div>
+</div>
+
+<!-- INSTRUCTIONS -->
+<div class="pg hidden" id="pg-instr">
+  <div class="pgi">
+    <div class="logo logo-sm" style="margin-bottom:2px;">HOW TO PLAY</div>
+    <span class="logo-tag" style="margin-bottom:10px;">COMBAT GUIDE</span>
+    <div class="sec-lbl">⚔ ATTACKS</div>
+    <div class="ig">
+      <div class="ic"><span class="ic-ico">👊</span><span class="ic-key">Q / 1</span><span class="ic-nm" style="color:#ff8c00;">PUNCH</span><span class="ic-ds">Fast jab. 15% crit. Builds combo & rage.</span><span class="ic-dmg" style="color:#ff8c00;">8–15 DMG</span></div>
+      <div class="ic"><span class="ic-ico">🦵</span><span class="ic-key">W / 2</span><span class="ic-nm" style="color:#ff4444;">KICK</span><span class="ic-ds">Heavy sweep. 12% crit. Causes bleed.</span><span class="ic-dmg" style="color:#ff4444;">14–22 DMG</span></div>
+      <div class="ic"><span class="ic-ico">💥</span><span class="ic-key">E / 3</span><span class="ic-nm" style="color:#bb44ff;">SPECIAL</span><span class="ic-ds">Ultimate strike. Only 3 uses per fight.</span><span class="ic-dmg" style="color:#bb44ff;">28–42 DMG</span></div>
+      <div class="ic"><span class="ic-ico">💊</span><span class="ic-key">R / 4</span><span class="ic-nm" style="color:#00e676;">HEAL</span><span class="ic-ds">Restore HP. Only 2 uses. Save wisely!</span><span class="ic-dmg" style="color:#00e676;">+20–35 HP</span></div>
+    </div>
+    <div class="divider" style="margin:8px 0;"></div>
+    <div class="sec-lbl">🚶 MOVEMENT & DEFENCE</div>
+    <div class="ig">
+      <div class="ic"><span class="ic-ico">⬅</span><span class="ic-key">A / ←</span><span class="ic-nm" style="color:#44aaff;">MOVE BACK</span><span class="ic-ds">Step backward. Dodge incoming blows.</span></div>
+      <div class="ic"><span class="ic-ico">➡</span><span class="ic-key">D / →</span><span class="ic-nm" style="color:#44aaff;">MOVE FWD</span><span class="ic-ds">Advance on enemy. Close the gap.</span></div>
+      <div class="ic"><span class="ic-ico">🛡️</span><span class="ic-key">S / ↓</span><span class="ic-nm" style="color:#ffd700;">BLOCK</span><span class="ic-ds">Reduce damage by 60%. Hold to guard.</span></div>
+      <div class="ic"><span class="ic-ico">💀</span><span class="ic-key">—</span><span class="ic-nm" style="color:#ff4444;">DEATH</span><span class="ic-ds">Loser collapses on the ground. Game over!</span></div>
+    </div>
+    <div class="divider" style="margin:8px 0;"></div>
+    <div class="tip"><span class="tip-ico">🔥</span><span class="tip-txt"><b>RAGE METER</b> — Fill by attacking. At 100% → RAGE MODE: +40% damage for next hit.</span></div>
+    <div class="tip"><span class="tip-ico">⚡</span><span class="tip-txt"><b>COMBO</b> — Chain 3+ hits for +22% bonus. Resets on damage or block.</span></div>
+    <div class="tip"><span class="tip-ico">👹</span><span class="tip-txt"><b>BOSSES</b> every 5 levels up to 100 — grow bigger and more horrifying every tier!</span></div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-ghost btn-sm" onclick="goTo('pg-splash')">← BACK</button>
+      <button class="btn btn-fire" onclick="goTo('pg-login')">ENTER ARENA →</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="pg hidden" id="pg-login">
+  <div class="pgi">
+    <div class="logo logo-sm" style="margin-bottom:2px;">SHADOW STRIKER X</div>
+    <span class="logo-tag" style="margin-bottom:14px;">ENTER YOUR FIGHTER NAME</span>
+    <div id="saved-wrap" class="sw" style="display:none;">
+      <span class="sw-lbl">— RETURNING FIGHTERS —</span>
+      <div class="sc" id="saved-chips"></div>
+      <div class="divider"></div>
+    </div>
+    <input class="ni" id="name-input" type="text" maxlength="12" placeholder="YOUR NAME" autocomplete="off" spellcheck="false">
+    <div class="ni-hint">2–12 characters · Letters and numbers only</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="goTo('pg-instr')">← BACK</button>
+      <button class="btn btn-fire" onclick="doLogin()">ENTER →</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="pg hidden" id="pg-home" style="padding:0;justify-content:flex-start;align-items:stretch;">
+  <div style="display:flex;flex-direction:column;width:100%;height:100%;">
+    <div class="htopbar">
+      <span class="hlogo-sm">SSX</span>
+      <div class="hplayer" onclick="switchTab('account')">
+        <span id="hp-ico" style="font-size:1.1rem;">🔥</span>
+        <div><div class="hpname" id="hp-name">FIGHTER</div><div class="hplv" id="hp-lv">LV 0 · 0 PTS</div></div>
+      </div>
+    </div>
+    <div class="htabs">
+      <div class="htab active" id="tab-levels" onclick="switchTab('levels')">⚔ LEVELS</div>
+      <div class="htab" id="tab-account" onclick="switchTab('account')">👤 ACCOUNT</div>
+      <div class="htab" id="tab-lb" onclick="switchTab('lb')">🏆 RANKS</div>
+    </div>
+    <div class="hcontent" id="home-content"></div>
+  </div>
+  <div class="hfab">
+    <button class="btn btn-ghost hfab-btn" onclick="continueRun()">▶ CONTINUE</button>
+    <button class="btn btn-fire hfab-btn" onclick="goToCharSelect()">⚔ SELECT FIGHTER & FIGHT</button>
+  </div>
+</div>
+
+<!-- CHAR SELECT -->
+<div class="pg hidden" id="pg-char">
+  <div class="pgi">
+    <div class="logo logo-sm" style="margin-bottom:2px;">CHOOSE FIGHTER</div>
+    <span class="logo-tag" style="margin-bottom:10px;">PLAYING AS <span id="csel-player" style="-webkit-text-fill-color:var(--fire);color:var(--fire);">FIGHTER</span></span>
+    <div id="csel-level-info"></div>
+    <div class="csgrid" id="csel-grid"></div>
+    <div class="csprev" id="csel-prev"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost btn-sm" onclick="goToHomeFromChar()">⌂ HOME</button>
+      <button class="btn btn-fire" onclick="startFight()">⚔ FIGHT!</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIGHT HUD -->
+<div id="fhud" style="display:none;">
+  <div class="fhf"><div class="fhn p1c" id="fhn1">INFERNO</div><div class="hbw" id="fhbw1"><div class="hb p1b" id="fhb1" style="width:100%"></div></div><div class="hhp" id="fhh1">115/115</div><div class="rw"><div class="rf" id="rf1" style="width:0%"></div></div></div>
+  <div class="fhc"><div class="fhlv">LV <span id="fhlv">1</span></div><div class="fhtimer" id="fhtimer">60</div><div class="fhstage" id="fhstage">DOJO</div><div class="fhsc">⚡ <span id="fhsc">0</span></div></div>
+  <div class="fhf r"><div class="fhn p2c" id="fhn2">SHADOW</div><div class="hbw" id="fhbw2"><div class="hb p2b" id="fhb2" style="width:100%"></div></div><div class="hhp" id="fhh2">80/80</div><div class="rw" style="direction:rtl"><div class="rf" id="rf2" style="width:0%;float:right;background:linear-gradient(270deg,#0044cc,#00aaff)"></div></div></div>
+</div>
+<div id="ldots" style="display:none;"></div>
+
+<!-- FIGHT CONTROLS -->
+<div id="fctrl" style="display:none;">
+  <div class="fctrl-top">
+    <div class="cb cb-punch" id="btn-punch" onclick="act('punch')"><span class="kb">Q</span><span class="ci">👊</span><span class="cn">PUNCH</span><span class="cdmg" style="color:#ff8c00" id="pdmg">8–15</span><div class="cbar3" id="cb-punch" style="background:var(--ember)"></div></div>
+    <div class="cb cb-kick" id="btn-kick" onclick="act('kick')"><span class="kb">W</span><span class="ci">🦵</span><span class="cn">KICK</span><span class="cdmg" style="color:#ff4444" id="kdmg">14–22</span><div class="cbar3" id="cb-kick" style="background:var(--red)"></div></div>
+    <div class="cb cb-special" id="btn-special" onclick="act('special')"><span class="kb">E</span><span class="ci">💥</span><span class="cn">SPECIAL</span><span class="cdmg" style="color:#bb44ff" id="sdmg">28–42</span><span class="cuse" style="color:#bb44ff" id="suse">✦✦✦</span><div class="cbar3" id="cb-special" style="background:var(--violet)"></div></div>
+    <div class="cb cb-heal" id="btn-heal" onclick="act('heal')"><span class="kb">R</span><span class="ci">💊</span><span class="cn">HEAL</span><span class="cdmg" style="color:#00e676">+20–35</span><span class="cuse" style="color:#00e676" id="huse">♥♥</span><div class="cbar3" id="cb-heal" style="background:var(--green)"></div></div>
+  </div>
+  <div class="fctrl-bot">
+    <div class="cb cb-move" id="btn-back" onclick="act('back')"><span class="ci">⬅</span><span class="cn" style="color:rgba(100,180,255,.5);">BACK &nbsp; A / ←</span><div class="cbar3" id="cb-back" style="background:#4488ff"></div></div>
+    <div class="cb cb-move" id="btn-fwd" onclick="act('fwd')"><span class="ci">➡</span><span class="cn" style="color:rgba(100,180,255,.5);">FORWARD &nbsp; D / →</span><div class="cbar3" id="cb-fwd" style="background:#4488ff"></div></div>
+    <div class="cb cb-block" id="btn-block" onmousedown="holdBlock(true)" onmouseup="holdBlock(false)" ontouchstart="holdBlock(true)" ontouchend="holdBlock(false)"><span class="ci">🛡️</span><span class="cn" style="color:rgba(255,215,0,.5);">BLOCK S/↓</span><div class="cbar3" id="cb-block" style="background:#ffd700"></div></div>
+  </div>
+</div>
+
+<!-- WIN OVERLAY -->
+<div class="fovl hidden" id="fovl-win">
+  <div class="fowt">LEVEL CLEAR!</div>
+  <div class="fsub" id="fw-sub">SCORE: 0</div>
+  <div class="fstars" id="fw-stars"></div>
+  <div class="fbp" id="fw-bonus">+20 HP</div>
+  <div class="fnc" id="fw-next"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <button class="ibtn" onclick="nextLevel()">SELECT FIGHTER →</button>
+    <button class="hob" onclick="goHomeFromFight()">⌂ HOME</button>
+  </div>
+</div>
+
+<!-- LOSE OVERLAY -->
+<div class="fovl hidden" id="fovl-lose">
+  <div class="fowl">DEFEATED!</div>
+  <div class="fdb" id="fl-body"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <div style="display:flex;gap:8px;">
+      <button class="ibtn dng" onclick="retryLevel()">↺ RETRY</button>
+      <button class="ibtn sec" onclick="goHomeFromFight()">⌂ HOME</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME CLEAR -->
+<div class="fovl hidden" id="fovl-gc">
+  <div class="fogc">CHAMPION!<br>ALL 100 LEVELS<br>CONQUERED</div>
+  <div class="fsub">◆ GRAND MASTER ◆</div>
+  <div class="fgcsc" id="fgc-sc">0</div>
+  <div class="fgcgr" id="fgc-gr">S</div>
+  <div class="fstars" id="fgc-stars" style="font-size:1.4rem;margin-bottom:10px;"></div>
+  <div class="aiq" id="fgc-quote" style="text-align:center;border-left:none;color:rgba(255,215,0,.52);"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <button class="ibtn" onclick="goHomeFromFight()">⌂ HOME</button>
+  </div>
+</div>
+
+<script src='script.js'></script>
+
+</body>
+</html>
