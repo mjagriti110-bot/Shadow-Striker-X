@@ -1105,7 +1105,7 @@ async function shareGame(e){
   if(window.levelData && window.levelData.maxLevel > 1) {
     text = `I reached Level ${levelData.maxLevel} in SHADOW STRIKER X! Can you beat my score?`;
   }
-  const url = window.location.protocol === 'file:' ? 'https://shadowstrikerx.app' : window.location.href;
+  const url = 'https://mjagriti110-bot.github.io/Shadow-Striker-X/';
   if(navigator.share){try{await navigator.share({title:'Shadow Striker X',text,url});}catch(err){}}
   else{try{await navigator.clipboard.writeText(text+" "+url);showAnn("LINK COPIED!", "#00d4ff");}catch(err){}}
 }
