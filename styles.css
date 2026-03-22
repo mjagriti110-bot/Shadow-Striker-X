@@ -133,7 +133,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-famil
 .lbsw{text-align:right;}
 .lbsv{font-family:'Orbitron',monospace;font-size:.62rem;color:var(--gold);display:block;}
 .lbsl{font-family:'Orbitron',monospace;font-size:.42rem;color:rgba(255,255,255,.24);display:block;}
+.lb-meta{font-family:'Orbitron',monospace;font-size:.38rem;color:rgba(255,255,255,.28);margin-top:3px;line-height:1.35;}
 .lb-empty{text-align:center;padding:22px;font-size:.68rem;color:rgba(255,255,255,.16);}
+.shop-hdr{font-family:'Orbitron',monospace;font-size:.46rem;letter-spacing:.14em;color:rgba(255,255,255,.26);margin-bottom:10px;text-align:center;}
+.shop-bal{display:flex;gap:8px;justify-content:center;margin-bottom:12px;flex-wrap:wrap;}
+.shop-bal .sb{min-width:100px;}
+.shop-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.shop-card{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;padding:10px 12px;display:flex;align-items:flex-start;gap:11px;}
+.shop-card .sci{font-size:1.85rem;line-height:1;flex-shrink:0;}
+.shop-card .sctx{flex:1;min-width:0;}
+.shop-card .scn{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:.08em;color:#fff;}
+.shop-card .scd{font-family:'Orbitron',monospace;font-size:.48rem;color:rgba(255,255,255,.32);margin-top:3px;line-height:1.35;}
+.shop-card .scp{font-family:'Orbitron',monospace;font-size:.46rem;margin-top:6px;color:rgba(255,215,0,.75);}
+.shop-card .scc{color:rgba(255,200,120,.85);}
+.shop-card .btn-shop{margin-top:8px;font-size:.58rem;padding:7px 12px;border-radius:6px;border:1px solid rgba(255,69,0,.45);background:linear-gradient(180deg,rgba(255,90,0,.25),rgba(255,50,0,.12));color:#fff;font-family:'Orbitron',monospace;letter-spacing:.08em;cursor:pointer;}
+.shop-card .btn-shop:hover{filter:brightness(1.08);}
+.shop-card .btn-shop:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+.shop-note{font-family:'Orbitron',monospace;font-size:.44rem;color:rgba(255,255,255,.22);text-align:center;line-height:1.45;padding:0 6px 8px;}
 .hfab{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(4,4,16,.96);border-top:1px solid var(--border);padding:9px 14px;display:flex;gap:7px;backdrop-filter:blur(18px);}
 .hfab .btn-fire{flex:1;font-size:.7rem;padding:11px 14px;}
 .hfab .btn-ghost{font-size:.62rem;padding:10px 12px;min-width:128px;}

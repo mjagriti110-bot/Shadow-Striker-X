@@ -16,9 +16,15 @@
 <!-- SPLASH -->
 <div class="pg" id="pg-splash" style="background:transparent;">
   <div class="logo" style="cursor:pointer;" onclick="goTo('pg-instr')">SHADOW<br>STRIKER X</div>
-  <span class="logo-tag">◆ ULTIMATE FIGHTING GAUNTLET ◆</span>
   <div class="splash-sub">100 LEVELS · REALISTIC FIGHTERS · AI ENEMIES</div>
   <div class="press-start" onclick="goTo('pg-instr')">▶ PRESS ANYWHERE TO START</div>
+  <button class="btn btn-ghost btn-sm" style="margin-top:30px; position:relative; z-index:10;" onclick="shareGame(event)">🔗 SHARE GAME</button>
+  <div style="margin-top:35px; font-size: 0.75rem; color: #666; display: flex; flex-wrap:wrap; justify-content:center; gap: 12px; z-index:10; position:relative; font-family:sans-serif;">
+    <span style="cursor:pointer; text-decoration:underline;" onclick="showInfo(event, 'about')">About Us</span>
+    <span style="cursor:pointer; text-decoration:underline;" onclick="showInfo(event, 'contact')">Contact Us</span>
+    <span style="cursor:pointer; text-decoration:underline;" onclick="showInfo(event, 'privacy')">Privacy Policy</span>
+    <span style="cursor:pointer; text-decoration:underline;" onclick="showInfo(event, 'terms')">Terms & Conditions</span>
+  </div>
 </div>
 
 <!-- INSTRUCTIONS -->
@@ -83,6 +89,7 @@
     </div>
     <div class="htabs">
       <div class="htab active" id="tab-levels" onclick="switchTab('levels')">⚔ LEVELS</div>
+      <div class="htab" id="tab-shop" onclick="switchTab('shop')">🛒 SHOP</div>
       <div class="htab" id="tab-account" onclick="switchTab('account')">👤 ACCOUNT</div>
       <div class="htab" id="tab-lb" onclick="switchTab('lb')">🏆 RANKS</div>
     </div>
@@ -141,7 +148,10 @@
   <div class="fnc" id="fw-next"></div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
     <button class="ibtn" onclick="nextLevel()">SELECT FIGHTER →</button>
-    <button class="hob" onclick="goHomeFromFight()">⌂ HOME</button>
+    <div style="display:flex;gap:8px;">
+      <button class="hob" onclick="shareGame()">🔗 SHARE GAME</button>
+      <button class="hob" onclick="goHomeFromFight()">⌂ HOME</button>
+    </div>
   </div>
 </div>
 
@@ -154,6 +164,7 @@
       <button class="ibtn dng" onclick="retryLevel()">↺ RETRY</button>
       <button class="ibtn sec" onclick="goHomeFromFight()">⌂ HOME</button>
     </div>
+    <button class="hob" onclick="shareGame()">🔗 SHARE SCORE</button>
   </div>
 </div>
 
@@ -167,7 +178,17 @@
   <div class="aiq" id="fgc-quote" style="text-align:center;border-left:none;color:rgba(255,215,0,.52);"></div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
     <button class="ibtn" onclick="goHomeFromFight()">⌂ HOME</button>
+    <button class="hob" onclick="shareGame()">🔗 SHARE EXCELLENCE</button>
   </div>
+</div>
+
+<!-- INFO OVERLAY -->
+<div class="fovl hidden" id="fovl-info" style="align-items:center; padding:20px; background:rgba(0,0,5,0.96); z-index:200;">
+  <div class="fowl" id="info-title" style="font-size: 2.2rem; color:var(--fire); text-shadow:0 0 15px var(--fire);">TITLE</div>
+  <div class="fdb" id="info-body" style="width:100%; max-width:600px; height:55vh; overflow-y:auto; text-align:left; font-family:'Inter',sans-serif; font-size:0.95rem; line-height:1.6; color:#ccc; border:1px solid #333; padding:20px; border-radius:6px; margin-bottom:20px; background:rgba(0,0,0,.5); scrollbar-width:thin; scrollbar-color:var(--fire) #111;">
+    <!-- Content injected here -->
+  </div>
+  <button class="ibtn" type="button" onclick="closeInfo(event)">CLOSE</button>
 </div>
 
 <script src='script.js'></script>

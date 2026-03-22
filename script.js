@@ -23,7 +23,7 @@
     }catch(e){}
   };
   async function savePlayer(nm,d){let p=await dbGet(K.pl)||{};p[nm]={...(p[nm]||{}),...d,name:nm,lastPlayed:new Date().toISOString()};await dbSet(K.pl,p);await dbSet(K.cu,nm);}
-  async function loadPlayer(nm){const p=await dbGet(K.pl)||{};return p[nm]||null;}
+  async function loadPlayer(nm){const p=await dbGet(K.pl)||{};const r=p[nm];if(!r)return null;return {...basePlayer(),...r,shopInv:mergeShopInv(r.shopInv)};}
   async function getAllPlayers(){const p=await dbGet(K.pl)||{};return Object.values(p).sort((a,b)=>(b.highScore||0)-(a.highScore||0));}
   async function saveLevelResult(nm,lv,res){
     let d=await dbGet(K.lv)||{};
@@ -52,8 +52,29 @@
     const d=await dbGet(K.pr)||{};
     return d[nm]||{curLv:1,totalSc:0,selChar:0,lastLevelPlayed:1};
   }
-  async function addLB(nm,ch,sc,lv){let lb=await dbGet(K.lb)||[];const ei=lb.findIndex(e=>e.name===nm);const en={name:nm,char:ch,score:sc,lv,date:new Date().toLocaleDateString()};if(ei>=0){if(sc>lb[ei].score)lb[ei]=en;}else lb.push(en);lb.sort((a,b)=>b.score-a.score);lb=lb.slice(0,12);await dbSet(K.lb,lb);return lb;}
  const getLB=async()=>await dbGet(K.lb)||[];
+ const DEF_SHOP_INV={extraSp:0,extraHeal:0,dmgBoost:0,rageAmp:0,comboElixir:0};
+ function mergeShopInv(inv){return {...DEF_SHOP_INV,...inv};}
+ function basePlayer(){return {charId:0,maxLevel:0,highScore:0,totalWins:0,totalScore:0,coins:0,bankPts:0,lastDailyClaim:'',shopInv:mergeShopInv({})};}
+ const SHOP_ITEMS=[
+  {id:'sp',name:'Extra Special',ico:'💥',desc:'+1 Special use on your next fight (stacks).',pts:175,coins:0,inc:{extraSp:1}},
+  {id:'heal',name:'Heal Capsule',ico:'💊',desc:'+1 Heal use on your next fight (stacks).',pts:120,coins:14,inc:{extraHeal:1}},
+  {id:'pwr',name:'Power Amp',ico:'⚡',desc:'+12% damage for your next fight.',pts:195,coins:16,inc:{dmgBoost:1}},
+  {id:'rage',name:'Rage Elixir',ico:'🔥',desc:'Faster rage build next fight.',pts:85,coins:26,inc:{rageAmp:1}},
+  {id:'combo',name:'Combo Serum',ico:'🔗',desc:'Stronger combo damage bonus next fight.',pts:245,coins:20,inc:{comboElixir:1}},
+  {id:'pack',name:'Brawler Pack',ico:'📦',desc:'+1 Special and +1 Heal for next fight.',pts:285,coins:38,inc:{extraSp:1,extraHeal:1}},
+  {id:'coin_heal',name:'Field Med-Kit',ico:'⛑️',desc:'+1 Heal next fight (coins only).',pts:0,coins:42,inc:{extraHeal:1}},
+ ];
+ async function rebuildLeaderboard(){
+  const players=await getAllPlayers();
+  const lb=players.slice(0,12).map(p=>{
+    const ch=CHARS[p.charId||0];
+    let date='';
+    try{if(p.lastPlayed)date=new Date(p.lastPlayed).toLocaleDateString();}catch(e){}
+    return {name:p.name,char:ch?.name||'FIGHTER',score:p.highScore||0,lv:p.maxLevel||0,coins:p.coins||0,wins:p.totalWins||0,bankPts:p.bankPts||0,date};
+  });
+  await dbSet(K.lb,lb);
+ }
 
 
 // ═══════════════════════════════════════════════
@@ -86,6 +107,17 @@ function sfxSel(){const a=gac();if(!a)return;const t=a.currentTime;mkOsc(523,'si
 function sfxTick(){const a=gac();if(!a)return;mkOsc(880,'sine',a.currentTime,.065,.2,a);}
 function sfxUnlock(){const a=gac();if(!a)return;const t=a.currentTime;[440,550,660,880].forEach((f,i)=>mkOsc(f,'sine',t+i*.06,.2,.2,a));}
 
+function speakAnnouncer(txt){
+  if(typeof window.speechSynthesis!=='undefined'){
+    try{
+      const u=new SpeechSynthesisUtterance(txt);
+      u.rate=0.9;u.pitch=0.65;u.volume=1.0;
+      const v=window.speechSynthesis.getVoices().find(x=>x.name.includes('Male')||x.name.includes('Google UK English Male')||x.name.includes('David'));
+      if(v)u.voice=v;window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+}
+
 // BGM — cinematic synthwave battle loop
 let bgmRunning=false,bgmTimer=null,bgmBeat=0;
 function startBGM(){
@@ -93,13 +125,14 @@ function startBGM(){
   const a=gac();if(!a)return;
   if(a.state==='suspended')a.resume().catch(()=>{});
   bgmRunning=true;
-  const BPM=126,BEAT=60/BPM,STEP=BEAT*0.5,LOOK=1.6;
-  const KICK=[1,0,0,0,1,0,0,1,1,0,0,0,1,0,1,0];
-  const SNARE=[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1];
-  const HAT=[1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1];
-  const BASS=[55,55,0,65,55,55,0,73,49,49,0,58,55,55,0,65];
+  // Slower, intense doom-synth style BGM
+  const BPM=90,BEAT=60/BPM,STEP=BEAT*0.25,LOOK=1.6;
+  const KICK=[1,0,0,0, 0,0,0,0, 1,0,0,1, 0,0,0,0];
+  const SNARE=[0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
+  const HAT=[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,1,1,1];
+  const BASS=[41,0,41,0, 41,0,41,0, 49,0,0,49, 0,49,41,0];
   const CHORDS=[[220,277,330],[196,247,294],[174,220,262],[196,247,294]];
-  const LEAD=[0,330,392,440,392,330,294,0,262,294,330,392,330,294,262,0];
+  const LEAD=[330,0,0,392, 0,0,0,330, 0,0,440,0, 0,392,0,0];
   let t=a.currentTime+0.08;
   function schedule(){
     if(!bgmRunning)return;
@@ -259,7 +292,7 @@ async function initLogin(){
   const lb=await getLB();
   if(players.length>0){
     document.getElementById('saved-wrap').style.display='block';
-    document.getElementById('saved-chips').innerHTML=players.slice(0,6).map(p=>`<div class="chip" onclick="quickLogin('${p.name}')"><span>${CHARS[p.charId||0]?.ico||'🔥'}</span><span>${p.name}</span><span class="chip-lv">LV${p.maxLevel||0} · ${p.highScore||0}pts</span></div>`).join('');
+    document.getElementById('saved-chips').innerHTML=players.slice(0,6).map(p=>`<div class="chip" onclick="quickLogin('${p.name}')"><span>${CHARS[p.charId||0]?.ico||'🔥'}</span><span>${p.name}</span><span class="chip-lv">LV${p.maxLevel||0} · ${p.highScore||0} · 🪙${p.coins||0}</span></div>`).join('');
   }
   const last=await dbGet(K.cu);
   if(last)document.getElementById('name-input').value=last;
@@ -270,7 +303,7 @@ async function doLogin(){
   let n=document.getElementById('name-input').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(n.length<2){document.getElementById('name-input').style.borderColor='var(--red)';setTimeout(()=>document.getElementById('name-input').style.borderColor='',1200);return;}
   playerName=n;
-  playerData=await loadPlayer(playerName)||{charId:0,maxLevel:0,highScore:0,totalWins:0,totalScore:0,coins:0,lastDailyClaim:''};
+  playerData=await loadPlayer(playerName)||basePlayer();
   levelData=await loadLevelData(playerName);
   selChar=playerData.charId||0;
   const maxDone=levelData.maxLevel||0;
@@ -290,12 +323,12 @@ document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key===
 //  HOME DASHBOARD
 // ═══════════════════════════════════════════════
 async function renderHome(){
-  playerData=await loadPlayer(playerName)||{charId:0,maxLevel:0,highScore:0,totalWins:0,totalScore:0,coins:0,lastDailyClaim:''};
+  playerData=await loadPlayer(playerName)||basePlayer();
   levelData=await loadLevelData(playerName);
   const ch=CHARS[playerData.charId||0];
   document.getElementById('hp-ico').textContent=ch.ico;
   document.getElementById('hp-name').textContent=playerName;
-  document.getElementById('hp-lv').textContent=`LV ${levelData.maxLevel||0} · ${playerData.highScore||0} PTS · 🪙 ${playerData.coins||0}`;
+  document.getElementById('hp-lv').textContent=`LV ${levelData.maxLevel||0} · ${playerData.highScore||0} BEST · ⚡${playerData.bankPts||0} · 🪙${playerData.coins||0}`;
   switchTab(curTab);
 }
 function getAchievements(){
@@ -313,8 +346,9 @@ function canClaimDaily(){
 }
 function switchTab(tab){
   curTab=tab;
-  ['levels','account','lb'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
+  ['levels','shop','account','lb'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
   if(tab==='levels'){loadLevelData(playerName).then(d=>{levelData=d;renderLevelsTab();});}
+  else if(tab==='shop')renderShopTab();
   else if(tab==='account')renderAccountTab();
   else renderLBTab();
 }
@@ -322,7 +356,7 @@ function renderLevelsTab(){
   const maxDone=levelData.maxLevel||0,nextU=Math.min(maxDone+1,MAX_LEVELS),pct=Math.round(maxDone/MAX_LEVELS*100);
   let h=`<div class="lvhdr"><div><span style="font-family:'Orbitron',monospace;font-size:.5rem;color:rgba(255,255,255,.28);">${maxDone}/${MAX_LEVELS} DONE</span></div><div style="display:flex;align-items:center;gap:5px;"><div class="pbw"><div class="pbf" style="width:${pct}%"></div></div><span class="ppct">${pct}%</span></div></div>
   <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-    <div><div style="font-family:'Orbitron',monospace;font-size:.46rem;letter-spacing:.16em;color:rgba(255,255,255,.24);">DAILY REWARD</div><div style="font-size:.58rem;color:rgba(255,255,255,.34);">Claim once per day for bonus points and coins.</div></div>
+    <div><div style="font-family:'Orbitron',monospace;font-size:.46rem;letter-spacing:.16em;color:rgba(255,255,255,.24);">DAILY REWARD</div><div style="font-size:.58rem;color:rgba(255,255,255,.34);">Claim once per day for score, arena PTS (⚡), and coins.</div></div>
     <button class="btn ${canClaimDaily()?'btn-fire':'btn-ghost'} btn-sm" ${canClaimDaily()?'':'disabled'} onclick="claimDailyReward()">${canClaimDaily()?'CLAIM +250':'CLAIMED'}</button>
   </div>
   <div class="lgrid">`;
@@ -352,6 +386,8 @@ function renderAccountTab(){
     <div class="sb"><span class="sv" style="color:var(--green)">${maxDone}</span><span class="sl">MAX LEVEL</span></div>
     <div class="sb"><span class="sv" style="color:var(--ice)">${playerData.totalWins||0}</span><span class="sl">TOTAL WINS</span></div>
     <div class="sb"><span class="sv" style="color:var(--ember)">${playerData.coins||0}</span><span class="sl">COINS</span></div>
+    <div class="sb"><span class="sv" style="color:#88ccff">${playerData.bankPts||0}</span><span class="sl">ARENA PTS</span></div>
+    <div class="sb"><span class="sv" style="color:#bb88ff">${(playerData.shopInv&&playerData.shopInv.extraSp||0)+(playerData.shopInv&&playerData.shopInv.extraHeal||0)}</span><span class="sl">STASH ITEMS</span></div>
   </div>
   <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;padding:9px 12px;margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-family:'Orbitron',monospace;font-size:.46rem;color:rgba(255,255,255,.22);">GAUNTLET PROGRESS</span><span style="font-family:'Orbitron',monospace;font-size:.46rem;color:var(--gold);">${pct}%</span></div>
@@ -373,15 +409,57 @@ function renderAccountTab(){
   </div>`).join('')}</div>`;
 }
 async function switchChar(i){sfxSel();selChar=i;await savePlayer(playerName,{charId:i});playerData=await loadPlayer(playerName);renderAccountTab();document.getElementById('hp-ico').textContent=CHARS[i].ico;}
+function renderShopTab(){
+  const inv=mergeShopInv(playerData.shopInv);
+  const bp=playerData.bankPts||0,co=playerData.coins||0;
+  const invLine=`Stash — 💥×${inv.extraSp} · 💊×${inv.extraHeal} · ⚡pwr×${inv.dmgBoost} · 🔥rage×${inv.rageAmp} · 🔗×${inv.comboElixir}`;
+  const cards=SHOP_ITEMS.map(it=>{
+    const ok=bp>=it.pts&&co>=it.coins;
+    const price=[it.pts?`⚡ ${it.pts}`:'',it.coins?`🪙 ${it.coins}`:''].filter(Boolean).join(' · ');
+    return`<div class="shop-card">
+      <span class="sci">${it.ico}</span>
+      <div class="sctx">
+        <div class="scn">${it.name}</div>
+        <div class="scd">${it.desc}</div>
+        <div class="scp">${price}</div>
+        <button class="btn-shop" ${ok?'':'disabled'} onclick="buyShopItem('${it.id}')">BUY</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('home-content').innerHTML=`
+  <div class="shop-hdr">ARENA SUPPLY — spend ⚡ arena PTS & 🪙 coins</div>
+  <div class="shop-bal">
+    <div class="sb"><span class="sv" style="color:#88ccff">${bp}</span><span class="sl">ARENA PTS</span></div>
+    <div class="sb"><span class="sv" style="color:var(--ember)">${co}</span><span class="sl">COINS</span></div>
+  </div>
+  <div class="shop-note">${invLine}<br>One of each buff type is used automatically at the start of the next fight (stacks carry over).</div>
+  <div class="shop-grid">${cards}</div>`;
+}
+async function buyShopItem(id){
+  const it=SHOP_ITEMS.find(x=>x.id===id);if(!it)return;
+  playerData=await loadPlayer(playerName)||basePlayer();
+  const bp=playerData.bankPts||0,co=playerData.coins||0;
+  if(bp<it.pts||co<it.coins){sfxLose();return;}
+  const nextInv=mergeShopInv(playerData.shopInv);
+  Object.keys(it.inc).forEach(k=>{nextInv[k]=(nextInv[k]||0)+it.inc[k];});
+  await savePlayer(playerName,{bankPts:bp-it.pts,coins:co-it.coins,shopInv:nextInv});
+  playerData=await loadPlayer(playerName);
+  sfxUnlock();
+  document.getElementById('hp-lv').textContent=`LV ${levelData.maxLevel||0} · ${playerData.highScore||0} BEST · ⚡${playerData.bankPts||0} · 🪙${playerData.coins||0}`;
+  renderShopTab();
+  await rebuildLeaderboard();
+}
 async function renderLBTab(){
+  await rebuildLeaderboard();
   const lb=await getLB();
   if(!lb.length){document.getElementById('home-content').innerHTML='<div class="lb-empty">No champions yet. Be the first!</div>';return;}
   const ranks=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟','11','12'];
   document.getElementById('home-content').innerHTML='<div class="lbw">'+lb.map((e,i)=>`
     <div class="lbrow ${e.name===playerName?'me':''}">
       <span class="lbrk">${ranks[i]||i+1}</span>
-      <div class="lbpi"><div class="lbpn">${e.name} <span class="lbpc">${CHARS.find(c=>c.name===e.char)?.ico||'⚔️'}</span>${e.name===playerName?`<span style="font-size:.44rem;color:var(--fire);font-family:'Orbitron',monospace;"> YOU</span>`:''}</div><div class="lbps">${e.char||'FIGHTER'} · ${e.date||''}</div></div>
-      <div class="lbsw"><span class="lbsv">${e.score}</span><span class="lbsl">LV ${e.lv||'?'}</span></div>
+      <div class="lbpi"><div class="lbpn">${e.name} <span class="lbpc">${CHARS.find(c=>c.name===e.char)?.ico||'⚔️'}</span>${e.name===playerName?`<span style="font-size:.44rem;color:var(--fire);font-family:'Orbitron',monospace;"> YOU</span>`:''}</div><div class="lbps">${e.char||'FIGHTER'} · ${e.date||''}</div>
+      <div class="lb-meta">🪙 ${e.coins??0} coins · ⚡ ${e.bankPts??0} arena · 🏅 ${e.wins??0} wins</div></div>
+      <div class="lbsw"><span class="lbsv">${e.score}</span><span class="lbsl">BEST SCORE</span><span class="lbsl" style="margin-top:2px;">MAX LV ${e.lv||'?'}</span></div>
     </div>`).join('')+'</div>';
 }
 async function goToCharSelect(){sfxNav();const maxDone=levelData?levelData.maxLevel||0:0;curLv=Math.min(maxDone+1,MAX_LEVELS);await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:curLv});renderCharSelect(curLv);goTo('pg-char');}
@@ -400,23 +478,26 @@ async function continueRun(){
 async function claimDailyReward(){
   if(!canClaimDaily())return;
   const today=new Date().toISOString().slice(0,10);
-  const bonusScore=250,bonusCoins=25;
-  playerData=await loadPlayer(playerName)||{charId:0,maxLevel:0,highScore:0,totalWins:0,totalScore:0,coins:0,lastDailyClaim:''};
+  const bonusScore=250,bonusCoins=25,bonusBank=120;
+  playerData=await loadPlayer(playerName)||basePlayer();
   totalSc=(totalSc||0)+bonusScore;
   const nextCoins=(playerData.coins||0)+bonusCoins;
+  const nextBank=(playerData.bankPts||0)+bonusBank;
   await savePlayer(playerName,{
     charId:selChar,
     coins:nextCoins,
+    bankPts:nextBank,
     lastDailyClaim:today,
     totalScore:(playerData.totalScore||0)+bonusScore,
     highScore:Math.max(playerData.highScore||0,totalSc)
   });
   await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:curLv});
   playerData=await loadPlayer(playerName);
-  showAnn(`DAILY +${bonusScore} PTS · +${bonusCoins} COINS`,'#ffd700');
+  showAnn(`DAILY +${bonusScore} SCORE · ⚡+${bonusBank} · +${bonusCoins} COINS`,'#ffd700');
   sfxUnlock();
   renderLevelsTab();
-  document.getElementById('hp-lv').textContent=`LV ${levelData.maxLevel||0} · ${playerData.highScore||0} PTS · 🪙 ${playerData.coins||0}`;
+  document.getElementById('hp-lv').textContent=`LV ${levelData.maxLevel||0} · ${playerData.highScore||0} BEST · ⚡${playerData.bankPts||0} · 🪙${playerData.coins||0}`;
+  await rebuildLeaderboard();
 }
 function renderCharSelect(lvNum){
   document.getElementById('csel-player').textContent=playerName;
@@ -431,7 +512,7 @@ function renderCharSelect(lvNum){
   updateCharPrev();
 }
 async function goToHomeFromChar(){sfxNav();await savePlayer(playerName,{charId:selChar});playerData=await loadPlayer(playerName);levelData=await loadLevelData(playerName);await renderHome();goTo('pg-home');}
-async function startFight(){sfxNav();await savePlayer(playerName,{charId:selChar});await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:curLv});playerData=await loadPlayer(playerName);goTo('__fight__');showFightUI();loadLevel(curLv,true);}
+async function startFight(){sfxNav();await savePlayer(playerName,{charId:selChar});await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:curLv});playerData=await loadPlayer(playerName)||basePlayer();goTo('__fight__');showFightUI();await loadLevel(curLv,true);}
 
 // ═══════════════════════════════════════════════
 //  CANVAS
@@ -442,16 +523,16 @@ if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.proto
 
 let PX=[],FLT=[];
 function spart(x,y,col,n,tp){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=Math.random()*8+2;PX.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-(tp==='blood'?4:.5),life:1,dc:Math.random()*.045+.022,sz:Math.random()*(tp==='blood'?7:4)+1.5,col,tp,gv:tp==='blood'?.22:.08});}}
-function tickPX(){PX=PX.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=p.gv;p.vx*=.94;p.life-=p.dc;return p.life>0;});}
-function drawPX(){PX.forEach(p=>{CX.save();CX.globalAlpha=p.life;CX.fillStyle=p.col;if(p.tp==='spark'){CX.shadowBlur=14;CX.shadowColor=p.col;}CX.beginPath();CX.arc(p.x,p.y,p.sz,0,Math.PI*2);CX.fill();CX.restore();});}
+function tickPX(dt){const gY=CV.height*.72;const vxF=Math.pow(0.94,dt);PX=PX.filter(p=>{if(p.tp==='blood'&&p.y>=gY){p.y=gY;p.vy=0;p.vx=0;p.dc=0.001;} p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=p.gv*dt;p.vx*=vxF;p.life-=p.dc*dt;return p.life>0;});}
+function drawPX(){PX.forEach(p=>{CX.save();CX.globalAlpha=p.life;CX.fillStyle=p.col;if(p.tp==='spark'){CX.shadowBlur=14;CX.shadowColor=p.col;}CX.beginPath();if(p.tp==='blood'&&p.vy===0){CX.ellipse(p.x,p.y,p.sz*1.8,p.sz*.5,0,0,Math.PI*2);}else{CX.arc(p.x,p.y,p.sz,0,Math.PI*2);}CX.fill();CX.restore();});}
 function sflt(x,y,t,col){FLT.push({x,y,t,col,life:1,vy:-2.8,sc:1.5});}
-function drawFLT(){FLT=FLT.filter(f=>{f.y+=f.vy;f.vy*=.93;f.life-=.018;f.sc=Math.max(1,f.sc*.97);if(f.life<=0)return false;CX.save();CX.globalAlpha=f.life;CX.font=`900 ${Math.floor(34*f.sc)}px 'Bebas Neue',sans-serif`;CX.textAlign='center';CX.textBaseline='middle';CX.strokeStyle='rgba(0,0,0,.95)';CX.lineWidth=6;CX.strokeText(f.t,f.x,f.y);CX.fillStyle=f.col;CX.fillText(f.t,f.x,f.y);CX.restore();return true;});}
+function drawFLT(dt){const vyF=Math.pow(0.93,dt||1),scF=Math.pow(0.97,dt||1);FLT=FLT.filter(f=>{f.y+=f.vy*dt;f.vy*=vyF;f.life-=0.018*dt;f.sc=Math.max(1,f.sc*scF);if(f.life<=0)return false;CX.save();CX.globalAlpha=f.life;CX.font=`900 ${Math.floor(34*f.sc)}px 'Bebas Neue',sans-serif`;CX.textAlign='center';CX.textBaseline='middle';CX.strokeStyle='rgba(0,0,0,.95)';CX.lineWidth=6;CX.strokeText(f.t,f.x,f.y);CX.fillStyle=f.col;CX.fillText(f.t,f.x,f.y);CX.restore();return true;});}
 let SK={x:0,y:0,p:0};
 function doShake(p){SK.p=Math.max(SK.p,p);}
-function applyShake(){if(SK.p<.3){SK.p=0;SK.x=SK.y=0;return;}SK.x=(Math.random()-.5)*SK.p*2;SK.y=(Math.random()-.5)*SK.p*2;SK.p*=.72;}
+function applyShake(dt){if(SK.p<.3){SK.p=0;SK.x=SK.y=0;return;}SK.x=(Math.random()-.5)*SK.p*2;SK.y=(Math.random()-.5)*SK.p*2;SK.p*=Math.pow(0.72,dt||1);}
 let IMP=0;
 function doImpact(v){IMP=Math.max(IMP,v);}
-function drawImp(){if(IMP<.01)return;CX.save();CX.globalAlpha=IMP;CX.fillStyle='#fff';CX.fillRect(0,0,CV.width,CV.height);CX.restore();IMP*=.52;}
+function drawImp(dt){if(IMP<.01)return;CX.save();CX.globalAlpha=IMP;CX.fillStyle='#fff';CX.fillRect(0,0,CV.width,CV.height);CX.restore();IMP*=Math.pow(0.52,dt||1);}
 
 // ═══════════════════════════════════════════════
 //  REALISTIC FIGHTER DRAW — human anatomy
@@ -743,7 +824,7 @@ let lastT=0;
 function loop(ts=0){
   RAF=requestAnimationFrame(loop);
   const dt=Math.min((ts-lastT)/16.67,3);lastT=ts;
-  applyShake();tickPX();
+  applyShake(dt);tickPX(dt);
   CX.save();CX.translate(SK.x,SK.y);
   const W=CV.width,H=CV.height,gY=H*.72;
   drawBG(G.lv?G.lv.bg:'boss');
@@ -751,9 +832,10 @@ function loop(ts=0){
     // Update bobbing for idle states
     if(G.p1.state==='idle'||G.p1.state==='block'){G.p1.bob+=G.p1.bdir*.35*dt;if(Math.abs(G.p1.bob)>4)G.p1.bdir*=-1;}
     if(G.p2.state==='idle'||G.p2.state==='block'){G.p2.bob+=G.p2.bdir*.4*dt;if(Math.abs(G.p2.bob)>5)G.p2.bdir*=-1;}
-    // Update positions
-    G.p1.x+=(G.p1.targetX-G.p1.x)*.14;
-    G.p2.x+=(G.p2.targetX-G.p2.x)*.14;
+    // Update positions via frame-rate independent exp decay
+    const smoothF=1-Math.pow(0.86,dt||1);
+    G.p1.x+=(G.p1.targetX-G.p1.x)*smoothF;
+    G.p2.x+=(G.p2.targetX-G.p2.x)*smoothF;
     // Update death animation
     if(G.p1.state==='dead'){G.p1.deathProgress=Math.min((G.p1.deathProgress||0)+dt*.025,1);}
     if(G.p2.state==='dead'){G.p2.deathProgress=Math.min((G.p2.deathProgress||0)+dt*.025,1);}
@@ -764,7 +846,7 @@ function loop(ts=0){
     drawFighter(G.p1.x,gY,false,{...G.p1,deathProgress:G.p1.deathProgress||0},G.fd,1.0);
     drawFighter(G.p2.x,gY,true,{...G.p2,deathProgress:G.p2.deathProgress||0},G.ed,G.ed.sz||1.0);
   }
-  drawPX();drawFLT();drawImp();CX.restore();
+  drawPX();drawFLT(dt);drawImp(dt);CX.restore();
 }
 
 function buildDots(cur){const d=document.getElementById('ldots');d.innerHTML=LEVELS.map((l,i)=>{let cls='ld';if(l.e.boss)cls+=' bdot';if(i+1<cur)cls+=' done';else if(i+1===cur)cls+=' cur';return`<div class="${cls}"></div>`;}).join('');}
@@ -779,13 +861,29 @@ function updateHUD(){
   document.getElementById('rf1').style.width=(G.rage||0)+'%';document.getElementById('rf2').style.width=(G.eRage||0)+'%';
 }
 
-function loadLevel(n,fresh){
+async function loadLevel(n,fresh){
   const lv=LEVELS[n-1],fd=CHARS[selChar],ed=lv.e;
   const pHp=fresh?fd.hp:Math.min((G.pHp||fd.hp)+(lv.bon||0),fd.hp);
   const W=CV.width,gY=CV.height*.72;
+  let spBonus=0,hlBonus=0,dmgMul=1,rageMul=1,comboMul=1.22;
+  if(fresh&&playerData){
+    let inv=mergeShopInv(playerData.shopInv);
+    let used=false;
+    if(inv.extraSp>0){inv.extraSp--;spBonus=1;used=true;}
+    if(inv.extraHeal>0){inv.extraHeal--;hlBonus=1;used=true;}
+    if(inv.dmgBoost>0){inv.dmgBoost--;dmgMul=1.12;used=true;}
+    if(inv.rageAmp>0){inv.rageAmp--;rageMul=1.28;used=true;}
+    if(inv.comboElixir>0){inv.comboElixir--;comboMul=1.32;used=true;}
+    if(used){
+      await savePlayer(playerName,{shopInv:inv});
+      playerData=await loadPlayer(playerName)||playerData;
+    }
+  }
+  const spTot=3+spBonus,hlTot=2+hlBonus;
   G={
     running:true,selChar,fd,ed,lv,pHp,pMax:fd.hp,eHp:ed.hp,eMax:ed.hp,
-    spUses:3,hlUses:2,combo:0,score:0,turn:0,busy:false,time:lv.time,cd:{},rage:0,eRage:0,blocking:false,
+    spUses:spTot,hlUses:hlTot,spMax:spTot,hlMax:hlTot,combo:0,score:0,turn:0,busy:false,time:lv.time,cd:{},rage:0,eRage:0,blocking:false,
+    dmgMul,rageMul,comboMul,
     p1:{x:W*.42,targetX:W*.42,bob:0,bdir:1,state:'idle',raging:false,deathProgress:0},
     p2:{x:W*.58,targetX:W*.58,bob:0,bdir:-1,state:'idle',raging:false,deathProgress:0},
   };
@@ -794,8 +892,12 @@ function loadLevel(n,fresh){
   document.getElementById('fhn2').textContent=ed.nm;document.getElementById('fhn2').style.color=ed.eye;document.getElementById('fhn2').style.textShadow=`0 0 12px ${ed.eye}`;
   document.getElementById('fhlv').textContent=n;document.getElementById('fhstage').textContent=lv.nm;document.getElementById('fhsc').textContent=totalSc;
   const te=document.getElementById('fhtimer');te.textContent=lv.time;te.classList.remove('dan');
-  document.getElementById('pdmg').textContent=`${fd.pR[0]}–${fd.pR[1]}`;document.getElementById('kdmg').textContent=`${fd.kR[0]}–${fd.kR[1]}`;document.getElementById('sdmg').textContent=`${fd.sR[0]}–${fd.sR[1]}`;
-  document.getElementById('suse').textContent='✦✦✦ 3';document.getElementById('huse').textContent='♥♥ 2';
+  const dm=G.dmgMul;
+  document.getElementById('pdmg').textContent=`${Math.floor(fd.pR[0]*dm)}–${Math.ceil(fd.pR[1]*dm)}`;
+  document.getElementById('kdmg').textContent=`${Math.floor(fd.kR[0]*dm)}–${Math.ceil(fd.kR[1]*dm)}`;
+  document.getElementById('sdmg').textContent=`${Math.floor(fd.sR[0]*dm)}–${Math.ceil(fd.sR[1]*dm)}`;
+  document.getElementById('suse').textContent='✦'.repeat(spTot)+` ${spTot}`;
+  document.getElementById('huse').textContent='♥'.repeat(hlTot)+` ${hlTot}`;
   ['punch','kick','special','heal','back','fwd'].forEach(t=>{
     setDis('btn-'+t,false);
     const cb=document.getElementById('cb-'+t);
@@ -805,7 +907,7 @@ function loadLevel(n,fresh){
   buildDots(n);updateHUD();
   clearInterval(TID);
   TID=setInterval(()=>{if(!G.running)return;G.time--;const te2=document.getElementById('fhtimer');te2.textContent=G.time;if(G.time<=10){te2.classList.add('dan');sfxTick();}if(G.time<=0){clearInterval(TID);timeOut();}},1000);
-  if(ed.boss){sfxBoss();lvlAnn('BOSS FIGHT!',ed.nm,ed.eye);}else lvlAnn(`LEVEL ${n}`,lv.nm,'#ffd700');
+  if(ed.boss){sfxBoss();lvlAnn('BOSS FIGHT!',ed.nm,ed.eye);speakAnnouncer('Boss Fight!');}else{lvlAnn(`LEVEL ${n}`,lv.nm,'#ffd700');speakAnnouncer('Fight!');}
   if(ed.taunts?.length)setTimeout(()=>showTaunt(ed.nm,ed.taunts[Math.floor(Math.random()*ed.taunts.length)],ed.eye),1800);
   if(Math.random()<.35)setTimeout(async()=>{const t=await aiTaunt(ed.nm,`fight start level ${n}`,G.pHp,G.eHp);if(t&&G.running)showTaunt(ed.nm,t,ed.eye);},4000);
 }
@@ -837,6 +939,9 @@ async function act(type){
   const fd=G.fd,W=CV.width,H=CV.height;
   const eX=G.p2.x,eY=H*.44,pX=G.p1.x,pY=H*.44;
   let dmg=0;
+  const rMul=G.rageMul||1;
+  const cMul=G.comboMul||1.22;
+  const dMul=G.dmgMul||1;
   const rB=G.rage>=100?1.4:1.0;
   if(G.rage>=100){G.rage=0;sfxRage();showAnn('RAGE MODE!','#ff4500');G.p1.raging=true;setTimeout(()=>{if(G.p1)G.p1.raging=false;},1500);}
 
@@ -854,10 +959,10 @@ async function act(type){
   }
 
   if(type==='punch'){
-    dmg=Math.floor(rng(fd.pR[0],fd.pR[1])*rB);
+    dmg=Math.floor(rng(fd.pR[0],fd.pR[1])*rB*dMul);
     const crit=Math.random()<.15;
-    if(crit){dmg=Math.floor(dmg*1.7);showAnn('CRITICAL!','#ff8800');sfxCrit();}else sfxPunch();
-    G.combo++;if(G.combo>=3){dmg=Math.floor(dmg*1.22);showCombo(G.combo);}G.rage=Math.min(100,G.rage+12);
+    if(crit){dmg=Math.floor(dmg*1.7);showAnn('CRITICAL!','#ff8800');sfxCrit();if(Math.random()<0.5)speakAnnouncer('Critical!');}else sfxPunch();
+    G.combo++;if(G.combo>=3){dmg=Math.floor(dmg*cMul);showCombo(G.combo);}G.rage=Math.min(100,G.rage+Math.floor(12*rMul));
     // Lunge forward then snap back
     const homeX=G.p1.targetX;
     G.p1.targetX=Math.min(G.p1.x+32,G.p2.x-78);
@@ -871,10 +976,10 @@ async function act(type){
     sflt(eX,eY-44,`-${dmg}`,crit?'#ff4400':'#ffcc00');
     if(crit&&G.running)setTimeout(async()=>{const t=await aiTaunt(G.ed.nm,'just got critically hit',G.pHp,G.eHp);if(t&&G.running)showTaunt(G.ed.nm,t,G.ed.eye);},600);
   }else if(type==='kick'){
-    dmg=Math.floor(rng(fd.kR[0],fd.kR[1])*rB);
+    dmg=Math.floor(rng(fd.kR[0],fd.kR[1])*rB*dMul);
     const crit=Math.random()<.12;
-    if(crit){dmg=Math.floor(dmg*1.8);showAnn('SUPER KICK!','#ff1100');sfxCrit();}else sfxKick();
-    G.combo++;if(G.combo>=3){dmg=Math.floor(dmg*1.22);showCombo(G.combo);}G.rage=Math.min(100,G.rage+16);
+    if(crit){dmg=Math.floor(dmg*1.8);showAnn('SUPER KICK!','#ff1100');sfxCrit();if(Math.random()<0.5)speakAnnouncer('Super hit!');}else sfxKick();
+    G.combo++;if(G.combo>=3){dmg=Math.floor(dmg*cMul);showCombo(G.combo);}G.rage=Math.min(100,G.rage+Math.floor(16*rMul));
     const homeX=G.p1.targetX;
     G.p1.targetX=Math.min(G.p1.x+36,G.p2.x-78);
     setPose('p1','kick',350);
@@ -886,15 +991,15 @@ async function act(type){
     spart(eX,eY,'#880000',crit?14:6,'blood');
     sflt(eX,eY-54,`-${dmg}`,crit?'#ff0000':'#ff6644');
   }else if(type==='special'){
-    dmg=Math.floor(rng(fd.sR[0],fd.sR[1])*rB);G.spUses--;G.combo++;G.rage=Math.min(100,G.rage+25);
+    dmg=Math.floor(rng(fd.sR[0],fd.sR[1])*rB*dMul);G.spUses--;G.combo++;G.rage=Math.min(100,G.rage+Math.floor(25*rMul));
     sfxSpecial();setPose('p1','special',500);showAnn('SPECIAL ATTACK!!','#cc44ff');doShake(30);doImpact(.42);htmlFlash('rgba(150,0,255,.32)');
     spart(W*.5,H*.54,'#cc44ff',60,'spark');spart(eX,eY,'#880088',22,'blood');spart(pX,pY,'#ff00ff',22,'spark');sflt(eX,eY-66,`-${dmg}!!`,'#dd44ff');showCombo(G.combo);
     await wait(340);sfxHit();setPose('p2','hurt',300);
-    document.getElementById('suse').textContent='✦'.repeat(G.spUses)+'░'.repeat(3-G.spUses)+` ${G.spUses}`;
+    document.getElementById('suse').textContent='✦'.repeat(G.spUses)+'░'.repeat(G.spMax-G.spUses)+` ${G.spUses}`;
   }else if(type==='heal'){
     const h=rng(20,35);G.hlUses--;G.combo=0;sfxHeal();G.pHp=Math.min(G.pHp+h,G.pMax);showAnn('HEALED!','#00e676');
     spart(pX,pY,'#00e676',30,'spark');sflt(pX,pY-54,`+${h} HP`,'#00e676');htmlFlash('rgba(0,230,120,.1)');
-    document.getElementById('huse').textContent='♥'.repeat(G.hlUses)+'░'.repeat(2-G.hlUses)+` ${G.hlUses}`;
+    document.getElementById('huse').textContent='♥'.repeat(G.hlUses)+'░'.repeat(G.hlMax-G.hlUses)+` ${G.hlUses}`;
     updateHUD();setCooldown('heal',2600);G.busy=false;disableBtns(false);return;
   }
 
@@ -942,7 +1047,7 @@ async function enemyTurn(){
       const cb=rng(10,18);
       G.eHp=Math.max(0,G.eHp-cb);
       G.score+=cb;
-      G.rage=Math.min(100,(G.rage||0)+14);
+      G.rage=Math.min(100,(G.rage||0)+Math.floor(14*(G.rageMul||1)));
       spart(G.p2.x,H*.44,'#00d4ff',16,'spark');
       sflt(G.p2.x,H*.44-48,`-${cb}`,'#66ddff');
       sfxCounter();
@@ -968,17 +1073,23 @@ async function showDeath(who){
   const target = who==='player' ? G.p1 : G.p2;
   if(!target) return;
   sfxDeath();
+  speakAnnouncer(who==='player' ? 'You lose!' : 'K O!');
+  if(who==='enemy'){
+    doShake(45);doImpact(0.8);htmlFlash('rgba(255,200,0,0.4)');
+    showAnn('K. O.!', '#ff0000');
+  }
   target.state = 'dead';
   target.deathProgress = 0;
   // Spawn impact particles
   const dx = who==='player' ? G.p1.x : G.p2.x;
-  spart(dx, CV.height*.65, '#cc0000', 20, 'blood');
-  spart(dx, CV.height*.55, '#888888', 12, 'spark');
+  spart(dx, CV.height*.65, '#cc0000', 40, 'blood');
+  spart(dx, CV.height*.55, '#888888', 22, 'spark');
   // Animate collapse
   return new Promise(res=>{
     let prog=0;
     const iv=setInterval(()=>{
-      prog+=0.032;
+      prog+= (who==='enemy') ? 0.012 : 0.032; // Finisher slow motion for enemy death!
+      if(who==='enemy'){ doShake(5); } // constant epic rumble
       target.deathProgress=Math.min(prog,1);
       if(prog>=1){clearInterval(iv);res();}
     },16);
@@ -987,6 +1098,56 @@ async function showDeath(who){
 
 function timeOut(){if(!G.running)return;G.pHp>=G.eHp?levelWin():levelLose();}
 
+async function shareGame(e){
+  if(e) e.stopPropagation();
+  sfxSel();
+  let text = `Play SHADOW STRIKER X, an epic arcade fighting game!`;
+  if(window.levelData && window.levelData.maxLevel > 1) {
+    text = `I reached Level ${levelData.maxLevel} in SHADOW STRIKER X! Can you beat my score?`;
+  }
+  const url = window.location.protocol === 'file:' ? 'https://shadowstrikerx.app' : window.location.href;
+  if(navigator.share){try{await navigator.share({title:'Shadow Striker X',text,url});}catch(err){}}
+  else{try{await navigator.clipboard.writeText(text+" "+url);showAnn("LINK COPIED!", "#00d4ff");}catch(err){}}
+}
+
+const INFO_TXT = {
+  about: `<h2>About Us</h2><p>SHADOW STRIKER X is an ultimate arcade fighting gauntlet created by mjagriti110.</p><p>We specialize in creating thrilling web-based gaming experiences that push the boundaries of HTML5 Canvas and modern browser capabilities.</p><p>Keep fighting and conquering the leaderboard!</p>`,
+  contact: `<h2>Contact Us</h2><p>Have questions, feedback, or need support?</p><p>Email: <b>am7135077@gmail.com</b></p><p>Follow us on social media for updates, leaderboards, and upcoming tournaments!</p>`,
+  privacy: `<h2>Privacy Policy</h2><p>Your privacy is important to us. SHADOW STRIKER X is completely contained entirely within your browser.</p><ul><li><b>Local Storage:</b> Game progress, high scores, and unlocked characters are stored locally on your device via <code>localStorage</code>.</li><li><b>Data Collection:</b> We do not collect, share, or sell any of your personal data.</li><li><b>Accounts:</b> No accounts are required. Play completely anonymously.</li></ul>`,
+  terms: `<h2>Terms and Conditions</h2><p>By playing SHADOW STRIKER X, you agree to these terms:</p><ol><li><b>Use:</b> The game and all its assets are provided "as-is" without any warranties.</li><li><b>Restrictions:</b> You may not reverse-engineer, distribute, or modify the core game engine for commercial purposes without explicit permission.</li><li><b>Liability:</b> We are not liable for any data loss regarding your save progress.</li></ol><p>Have fun and keep striking!</p>`
+};
+
+function showInfo(e, type) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  sfxSel();
+  const ov = document.getElementById('fovl-info');
+  const title = document.getElementById('info-title');
+  const body = document.getElementById('info-body');
+  
+  const titles = {
+    about: 'ABOUT US',
+    contact: 'CONTACT US',
+    privacy: 'PRIVACY POLICY',
+    terms: 'TERMS & CONDITIONS'
+  };
+  
+  title.textContent = titles[type] || 'INFORMATION';
+  body.innerHTML = INFO_TXT[type];
+  ov.classList.remove('hidden');
+}
+
+function closeInfo(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  sfxNav();
+  document.getElementById('fovl-info').classList.add('hidden');
+}
+
 async function levelWin(){
   G.running=false;clearInterval(TID);disableBtns(true);totalSc+=G.score;sfxWin();
   const stars=G.pHp>G.pMax*.66?3:G.pHp>G.pMax*.33?2:1;
@@ -994,11 +1155,16 @@ async function levelWin(){
   for(let i=0;i<6;i++)setTimeout(()=>{spart(W*(.15+Math.random()*.7),H*.5,'#ffd700',28,'spark');spart(W*(.15+Math.random()*.7),H*.5,'#ff8800',14,'spark');},i*110);
   const ch=CHARS[selChar];
   const newMax=Math.max(G.lv.n,playerData?.maxLevel||0);
-  await savePlayer(playerName,{charId:selChar,charName:ch.name,maxLevel:newMax,highScore:Math.max(totalSc,playerData?.highScore||0),totalScore:totalSc,totalWins:(playerData?.totalWins||0)+1});
+  const winPts=38+Math.floor(G.lv.n*2);
+  const winCoins=3+Math.floor(G.lv.n/5);
+  const nextBank=(playerData?.bankPts||0)+winPts;
+  const nextCoin=(playerData?.coins||0)+winCoins;
+  await savePlayer(playerName,{charId:selChar,charName:ch.name,maxLevel:newMax,highScore:Math.max(totalSc,playerData?.highScore||0),totalScore:totalSc,totalWins:(playerData?.totalWins||0)+1,bankPts:nextBank,coins:nextCoin});
   await saveLevelResult(playerName,G.lv.n,{score:G.score,stars,turns:G.turn});
   playerData=await loadPlayer(playerName);levelData=await loadLevelData(playerName);
   curLv=Math.min(G.lv.n+1,MAX_LEVELS);
   await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:G.lv.n});
+  await rebuildLeaderboard();
   if(G.lv.n===MAX_LEVELS){setTimeout(()=>showGC(),900);return;}
   sfxUnlock();
   const nxt=LEVELS[G.lv.n];
@@ -1033,8 +1199,8 @@ async function showGC(){
   document.getElementById('fgc-gr').textContent=gr;document.getElementById('fgc-gr').style.color=gr==='S'?'#ffd700':gr==='A'?'#ff8800':gr==='B'?'#44aaff':'#888';
   document.getElementById('fgc-stars').innerHTML='⭐'.repeat(gr==='S'?5:gr==='A'?4:gr==='B'?3:2);
   document.getElementById('fgc-quote').innerHTML='<span class="ail"><span class="ald"></span><span class="ald"></span><span class="ald"></span> GENERATING LEGEND...</span>';
-  await addLB(playerName,ch.name,totalSc,MAX_LEVELS);
   await savePlayer(playerName,{charId:selChar,charName:ch.name,maxLevel:MAX_LEVELS,highScore:Math.max(totalSc,playerData?.highScore||0),totalScore:totalSc,champion:true});
+  await rebuildLeaderboard();
   playerData=await loadPlayer(playerName);levelData=await loadLevelData(playerName);
   aiVictory(playerName,ch.name,totalSc).then(msg=>{const q=document.getElementById('fgc-quote');if(q)q.textContent=`"${msg}"`;});
   const W=CV.width,H=CV.height;for(let i=0;i<40;i++)setTimeout(()=>spart(Math.random()*W,H*.5,'#ffd700',18,'spark'),i*70);
@@ -1048,7 +1214,7 @@ async function goHomeFromFight(){
   ['fovl-win','fovl-lose','fovl-gc'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   hideFightUI();totalSc=0;
   await saveProgress(playerName,{curLv,totalSc,selChar,lastLevelPlayed:curLv});
-  playerData=await loadPlayer(playerName)||{charId:0,maxLevel:0,highScore:0,totalWins:0,totalScore:0};
+  playerData=await loadPlayer(playerName)||basePlayer();
   levelData=await loadLevelData(playerName);selChar=playerData.charId||0;
   await renderHome();goTo('pg-home');
 }
@@ -1083,7 +1249,7 @@ function setCooldown(type,ms){
 }
 function htmlFlash(col){const f=document.getElementById('flash');f.style.background=col;f.style.opacity='1';setTimeout(()=>f.style.opacity='0',110);}
 function showAnn(text,col){const el=document.getElementById('ann');el.textContent=text;el.style.color=col;el.style.textShadow=`0 0 26px ${col}`;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');}
-function showCombo(n){if(n<2)return;const el=document.getElementById('cpop');el.textContent=`${n}× COMBO!`;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');}
+function showCombo(n){if(n<2)return;if(n===3)speakAnnouncer('Combo!');if(n===6)speakAnnouncer('Awesome Combo!');const el=document.getElementById('cpop');el.textContent=`${n}× COMBO!`;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');}
 
 // Keyboard controls
 const keysDown={};
